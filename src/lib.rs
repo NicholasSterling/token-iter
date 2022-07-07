@@ -168,7 +168,7 @@ where Tokenizer: Fn(&mut TokenTool<'a>) -> Option<Token>
 
     fn next(&mut self) -> Option<Self::Item> {
         self.tool.current.and_then( |_|
-            (self.tokenizer)(&mut self.tool.mark_start()).map( |token|
+            (self.tokenizer)(self.tool.mark_start()).map( |token|
                 (self.tool.column_range(), token)
             )
         )
