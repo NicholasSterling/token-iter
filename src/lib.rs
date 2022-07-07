@@ -397,6 +397,7 @@ mod test {
             (3..6, Ident("网站的".into())),
         ];
         assert_eq!(results, expected_results);
+        assert_eq!(line.len(), 18);
     }
 
 }
