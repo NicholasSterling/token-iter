@@ -18,12 +18,13 @@
 //!  5. The library should automatically add the line number and column range for a token.
 //!  6. The library should be very efficient.  In particular, it should not allocate
 //!     heap memory for tokens, instead yielding &str's of substrings of the input.
-//!     Where a String is required, creating it is left to you,
+//!     Where a String is required, creating it is left to you (by calling .into()),
 //!     so that heap allocations are only done when really needed.
 //!  7. Invalid tokens are tokens, not errors.  Tokenization shouldn't stop just because
 //!     it doesn't recognize something.  And you want the same line/column info for bad tokens
-//!     as you do for good ones.  So the tokenizer just produces tokens, not Results containing
-//!     tokens or errors.
+//!     as you do for good ones.  So the tokenizer just produces tokens, not Results that
+//!     contain either a token or an error.
+//!  8. It should all work with multibyte characters.
 //!
 //! To use the library, you must
 //!  1. define a type for your tokens (typically, but not necessarily, an enum)
@@ -51,11 +52,11 @@
 //!     While, If,
 //!     Ident(String),          // e.g. foo12
 //!     Int(u64),               // e.g. 273
-//!     BadInt(String),         // e.g. 9873487239482398472498723423987234
+//!     BadInt(String),         // e.g. 9873487239482398477132498723423987234
 //!     Unrecognized(String)
 //! }
 //!
-//! // Produces tokens using a TokenTool to examine the characters.
+//! // Produces a token, using a TokenTool to examine the characters.
 //! fn tokenizer(tt: &mut TokenTool) -> Option<Token> {
 //!     use Token::*;
 //!     let is_digit = |c: char| c >= '0' && c <= '9';
@@ -91,29 +92,27 @@
 //!             foo = 1
 //!         }
 //!     "#;
-//!     for ((line_num, col_range), token) in tokens_in(code.lines(), &tokenizer) {
-//!        println!("{:?}", token);
+//!     for (line_num, col_range, token) in tokens_in(code.lines(), &tokenizer) {
+//!        println!("On line {line_num} at columns {col_range:?}: {token:?}");
 //!     }
 //! }
 //!
-//! // ((line #, column range), token)
-//!
-//! // ((1, 8..10), If)
-//! // ((1, 11..14), Ident("foo"))
-//! // ((1, 15..16), GT)
-//! // ((1, 17..20), Ident("bar"))
-//! // ((1, 21..22), LCurly)
-//! // ((2, 12..15), Ident("foo"))
-//! // ((2, 16..17), EQ)
-//! // ((2, 18..19), Int(1))
-//! // ((3, 8..9), RCurly)
+//! // On line 1 at columns 8..10: If
+//! // On line 1 at columns 11..14: Ident("foo")
+//! // On line 1 at columns 15..16: GT
+//! // On line 1 at columns 17..20: Ident("bar")
+//! // On line 1 at columns 21..22: LCurly
+//! // On line 2 at columns 12..15: Ident("foo")
+//! // On line 2 at columns 16..17: EQ
+//! // On line 2 at columns 18..19: Int(1)
+//! // On line 3 at columns 8..9: RCurly
 //! ```
 
 use std::ops::Range;
 use std::str::CharIndices;
 
 /// Returns an Iterator over the tokens found in the specified line,
-/// along with their column ranges.
+/// along with their column ranges.  Column numbers start at 0.
 pub fn tokens_in_line<'a, Str, Token: 'a, Tokenizer>(line: Str, tokenizer: &'a Tokenizer)
                                                      -> impl Iterator<Item = (Range<usize>, Token)> + 'a
 where
@@ -124,7 +123,7 @@ where
     let mut chars = line.char_indices();
     let next = chars.next();
     StrTokenIterator::<'a, Token, Tokenizer> {
-        bldr: TokenTool::<'a> {
+        tool: TokenTool::<'a> {
             line,
             chars,
             current: next,
@@ -137,17 +136,17 @@ where
 }
 
 /// Returns an Iterator over the tokens found in the specified lines,
-/// along with their line numbers and column ranges.
-pub fn tokens_in<'a, Token: 'a, Tokenizer: 'a, StrIter: 'a, Str: 'a>(iter: StrIter, tokenizer: &'a Tokenizer)
-                                                                     -> impl Iterator<Item = ((usize, Range<usize>), Token)> + 'a
+/// along with their line numbers and column ranges (both of which start at 0).
+pub fn tokens_in<'a, Token: 'a, Tokenizer, StrIter, Str>(iter: StrIter, tokenizer: &'a Tokenizer)
+                                                                     -> impl Iterator<Item = (usize, Range<usize>, Token)> + 'a
 where
-    StrIter: Iterator<Item = Str>,
-    Str: Into<&'a str>,
-    Tokenizer: Fn(&mut TokenTool<'a>) -> Option<Token>
+    StrIter: Iterator<Item = Str> + 'a,
+    Str: Into<&'a str> + 'a,
+    Tokenizer: Fn(&mut TokenTool<'a>) -> Option<Token> + 'a
 {
     iter.enumerate().flat_map( |(line_num, line)|
         tokens_in_line(line, tokenizer).map( move |(column_range, token)|
-            ((line_num, column_range), token)
+            (line_num, column_range, token)
         )
     )
 }
@@ -158,7 +157,7 @@ where
 struct StrTokenIterator<'a, Token, Tokenizer>
 where Tokenizer: Fn(&mut TokenTool<'a>) -> Option<Token>
 {
-    bldr: TokenTool<'a>,
+    tool: TokenTool<'a>,
     tokenizer: &'a Tokenizer
 }
 
@@ -168,9 +167,9 @@ where Tokenizer: Fn(&mut TokenTool<'a>) -> Option<Token>
     type Item = (Range<usize>, Token);
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.bldr.current.and_then( |_|
-            (self.tokenizer)(&mut self.bldr.mark_start()).map( |token|
-                (self.bldr.column_range(), token)
+        self.tool.current.and_then( |_|
+            (self.tokenizer)(&mut self.tool.mark_start()).map( |token|
+                (self.tool.column_range(), token)
             )
         )
     }
@@ -180,7 +179,7 @@ where Tokenizer: Fn(&mut TokenTool<'a>) -> Option<Token>
 ///// TokenTool /////////////////////////
 
 /// The tokenizer you write will be passed a TokenTool as an argument,
-/// and will call methods on it to figure out what constitutes a token
+/// and will call methods on it to figure out what the next token is
 /// and, if needed, get its text.  The TokenTool keeps track of the
 /// column range of the token.
 pub struct TokenTool<'a> {
@@ -359,8 +358,8 @@ mod test {
             LCurly, Ident("x".into()), EQ, Int(2), RCurly
         ];
         let results: Vec<_> = super::tokens_in(code.lines(), &tokenizer).collect();
-        assert!(results.iter().all( |((line, _), _)| *line == 0));
-        let tokens: Vec<_> = results.iter().map( |(_, token)| (*token).clone() ).collect();
+        assert!(results.iter().all( |(line, _, _)| *line == 0));
+        let tokens: Vec<_> = results.iter().map( |(_, _, token)| (*token).clone() ).collect();
         assert_eq!(tokens, expected_tokens);
     }
 
@@ -368,13 +367,35 @@ mod test {
     fn test_line_and_column() {
         let code = "{\n    foo = 2\n}";
         let expected_results = vec![
-            ((0, 0..1), LCurly),
-            ((1, 4..7), Ident("foo".into())),
-            ((1, 8..9), EQ),
-            ((1, 10..11), Int(2)),
-            ((2, 0..1), RCurly)
+            (0, 0..1, LCurly),
+            (1, 4..7, Ident("foo".into())),
+            (1, 8..9, EQ),
+            (1, 10..11, Int(2)),
+            (2, 0..1, RCurly)
         ];
         let results: Vec<_> = super::tokens_in(code.lines(), &tokenizer).collect();
+        assert_eq!(results, expected_results);
+    }
+
+    #[test]
+    fn test_multibyte() {
+        let line = "关于本网站的";
+        // Tokenizer calls     ^    LT, and anything else an Ident.
+        // So this should tokenize to Ident < Ident.
+        fn tokenizer(tt: &mut TokenTool) -> Option<Token> {
+            Some(
+                match tt.next()? {
+                    '本' => LT,
+                    _ => Ident(tt.take_while( |c| c != '本' ).into())
+                }
+            )
+        }
+        let results: Vec<_> = super::tokens_in_line(line, &tokenizer).collect();
+        let expected_results = [
+            (0..2, Ident("关于".into())),
+            (2..3, LT),
+            (3..6, Ident("网站的".into())),
+        ];
         assert_eq!(results, expected_results);
     }
 
