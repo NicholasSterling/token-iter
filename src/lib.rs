@@ -28,7 +28,7 @@
 //!
 //! To use the library, you must
 //!  1. define a type for your tokens (typically, but not necessarily, an enum)
-//!  2. write a tokenizer function that uses a TokenBuilder (a type provided by this library)
+//!  2. write a tokenizer function that uses a TokenTool (a type provided by this library)
 //!     to recognize a token and, if necessary, get the token's characters as an &str
 //!  3. call either\
 //!     `tokens_in_line(line, &tokenizer)`, if you know your code is a single line, or\
@@ -53,7 +53,7 @@
 //!     Ident(String),          // e.g. foo12
 //!     Int(u64),               // e.g. 273
 //!     BadInt(String),         // e.g. 9873487239482398477132498723423987234
-//!     Unrecognized(String)
+//!     Unrecognized(char)
 //! }
 //!
 //! // Produces a token, using a TokenTool to examine the characters.
@@ -61,27 +61,27 @@
 //!     use Token::*;
 //!     let is_digit = |c: char| c >= '0' && c <= '9';
 //!     Some(
-//!         match tt.skip_while(char::is_whitespace).next()? {
-//!             '<' => if tt.next_is('=') {LE} else {LT},
-//!             '>' => if tt.next_is('=') {GE} else {GT},
-//!             '=' => if tt.next_is('=') {EQEQ} else {EQ},
+//!         match tt.skip_while(char::is_whitespace).char()? {
+//!             '<' => if tt.at('=') {LE} else {LT},
+//!             '>' => if tt.at('=') {GE} else {GT},
+//!             '=' => if tt.at('=') {EQEQ} else {EQ},
 //!             '{' => LCurly,
 //!             '}' => RCurly,
 //!             c if c.is_alphabetic() =>
-//!                    match tt.take_while(char::is_alphanumeric).get() {
+//!                    match tt.take_while(char::is_alphanumeric).text() {
 //!                        "while" => While,
 //!                        "if" => If,
-//!                        text => Ident(text.into())
+//!                        s => Ident(s.into())
 //!                    },
 //!             c if is_digit(c) =>
-//!                    tt.take_while(is_digit).map( |it|
-//!                        if let Ok(n) = it.parse::<u64>() {
+//!                    tt.take_while(is_digit).map( |s|
+//!                        if let Ok(n) = s.parse::<u64>() {
 //!                            Int(n)
 //!                        } else {
-//!                            BadInt(it.into())
+//!                            BadInt(s.into())
 //!                        }
 //!                    ),
-//!             _ => Unrecognized(tt.into())
+//!             c => Unrecognized(c)
 //!         }
 //!     )
 //! }
@@ -221,7 +221,7 @@ impl<'a> TokenTool<'a> {
     }
 
     /// Returns the next character and adds it to the token.
-    pub fn next(&mut self) -> Option<char> {
+    pub fn char(&mut self) -> Option<char> {
         self.current.map( |(_, c)| {
             self.advance();
             c
@@ -230,7 +230,7 @@ impl<'a> TokenTool<'a> {
 
     /// If the next character matches c, adds the character to the token
     /// and returns true.  Otherwise returns false.
-    pub fn next_is(&mut self, c: char) -> bool {
+    pub fn at(&mut self, c: char) -> bool {
         if let Some((_, next_c)) = self.current {
             if next_c == c {
                 self.advance();
@@ -260,19 +260,19 @@ impl<'a> TokenTool<'a> {
     }
 
     /// Returns the text of the token as an &str.
-    pub fn get(&mut self) -> &'a str {
+    pub fn text(&mut self) -> &'a str {
         &self.line[self.str_range()]
     }
 
     /// Returns the text of the token, converted to the needed type.
-    /// This is just a shortcut for .get().into().
+    /// This is just a shortcut for .text().into().
     pub fn into<T: From<&'a str>>(&mut self) -> T {
-        T::from(self.get())
+        T::from(self.text())
     }
 
     /// Returns the result of applying f() to the token text.
     pub fn map<T>(&mut self, f: impl Fn(&'a str) -> T) -> T {
-        f(self.get())
+        f(self.text())
     }
 
 }
@@ -305,16 +305,16 @@ mod test {
     fn tokenizer(tt: &mut TokenTool) -> Option<Token> {
         let is_digit = |c: char| c >= '0' && c <= '9';
         Some(
-            match tt.skip_while(char::is_whitespace).next()? {
-                '<' =>  if tt.next_is('=') {LE} else {LT},
-                '>' =>  if tt.next_is('=') {GE} else {GT},
-                '=' =>  if tt.next_is('=') {EQEQ} else {EQ},
+            match tt.skip_while(char::is_whitespace).char()? {
+                '<' =>  if tt.at('=') {LE} else {LT},
+                '>' =>  if tt.at('=') {GE} else {GT},
+                '=' =>  if tt.at('=') {EQEQ} else {EQ},
                 '(' =>  LParen,
                 ')' =>  RParen,
                 '{' =>  LCurly,
                 '}' =>  RCurly,
                 c if c.is_alphabetic() =>
-                        match tt.take_while(char::is_alphanumeric).get() {
+                        match tt.take_while(char::is_alphanumeric).text() {
                             "if" => If,
                             "while" => While,
                             text => Ident(text.into()),
@@ -384,7 +384,7 @@ mod test {
         // So this should tokenize to Ident < Ident.
         fn tokenizer(tt: &mut TokenTool) -> Option<Token> {
             Some(
-                match tt.next()? {
+                match tt.char()? {
                     '本' => LT,
                     _ => Ident(tt.take_while( |c| c != '本' ).into())
                 }
