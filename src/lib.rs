@@ -51,7 +51,7 @@
 //!     LCurly, RCurly,         // { }
 //!     While, If,
 //!     Ident(String),          // e.g. foo12
-//!     Int(u64),               // e.g. 273
+//!     Int(usize),               // e.g. 273
 //!     BadInt(String),         // e.g. 9873487239482398477132498723423987234
 //!     Unrecognized(char)
 //! }
@@ -61,7 +61,7 @@
 //!     use Token::*;
 //!     let is_digit = |c: char| c >= '0' && c <= '9';
 //!     Some(
-//!         match tt.skip_while(char::is_whitespace).char()? {
+//!         match tt.skip_while(char::is_whitespace).next()? {
 //!             '<' => if tt.at('=') {LE} else {LT},
 //!             '>' => if tt.at('=') {GE} else {GT},
 //!             '=' => if tt.at('=') {EQEQ} else {EQ},
@@ -75,7 +75,7 @@
 //!                    },
 //!             c if is_digit(c) =>
 //!                    tt.take_while(is_digit).map( |s|
-//!                        if let Ok(n) = s.parse::<u64>() {
+//!                        if let Ok(n) = s.parse::<usize>() {
 //!                            Int(n)
 //!                        } else {
 //!                            BadInt(s.into())
@@ -221,15 +221,15 @@ impl<'a> TokenTool<'a> {
     }
 
     /// Returns the next character and adds it to the token.
-    pub fn char(&mut self) -> Option<char> {
+    fn char(&mut self) -> Option<char> {
         self.current.map( |(_, c)| {
             self.advance();
             c
         })
     }
 
-    /// If the next character matches c, adds the character to the token
-    /// and returns true.  Otherwise returns false.
+    /// If the next character is c (the argument, not the letter),
+    /// adds c to the token and returns true.  Otherwise just returns false.
     pub fn at(&mut self, c: char) -> bool {
         if let Some((_, next_c)) = self.current {
             if next_c == c {
@@ -238,6 +238,11 @@ impl<'a> TokenTool<'a> {
             }
         }
         false
+    }
+
+    /// Returns the next character without advancing.
+    pub fn peek(&mut self) -> Option<char> {
+        self.current.map( |(_, c)| c )
     }
 
     /// Keeps adding characters to the token while f(char) is true.
@@ -275,6 +280,13 @@ impl<'a> TokenTool<'a> {
         f(self.text())
     }
 
+}  // impl TokenTool
+
+impl<'a> Iterator for TokenTool<'a> {
+    type Item = char;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.char()
+    }
 }
 
 
@@ -296,16 +308,17 @@ mod test {
         If,                     // if
         While,                  // while
         Ident(String),          // e.g. foo
-        Int(u64),               // e.g. 273
+        Int(usize),               // e.g. 273
         BadInt(String),         // e.g. 9873487239482398472498723423987234
         Unrecognized(String),   // e.g. @
     }
     use Token::*;
+    use crate::tokens_in_line;
 
     fn tokenizer(tt: &mut TokenTool) -> Option<Token> {
         let is_digit = |c: char| c >= '0' && c <= '9';
         Some(
-            match tt.skip_while(char::is_whitespace).char()? {
+            match tt.skip_while(char::is_whitespace).next()? {
                 '<' =>  if tt.at('=') {LE} else {LT},
                 '>' =>  if tt.at('=') {GE} else {GT},
                 '=' =>  if tt.at('=') {EQEQ} else {EQ},
@@ -321,7 +334,7 @@ mod test {
                         },
                 c if is_digit(c) =>
                         tt.take_while(is_digit).map( |it|
-                            if let Ok(n) = it.parse::<u64>() {
+                            if let Ok(n) = it.parse::<usize>() {
                                 Int(n)
                             } else {
                                 BadInt(it.into())
@@ -384,7 +397,7 @@ mod test {
         // So this should tokenize to Ident < Ident.
         fn tokenizer(tt: &mut TokenTool) -> Option<Token> {
             Some(
-                match tt.char()? {
+                match tt.next()? {
                     '本' => LT,
                     _ => Ident(tt.take_while( |c| c != '本' ).into())
                 }
@@ -398,6 +411,16 @@ mod test {
         ];
         assert_eq!(results, expected_results);
         assert_eq!(line.len(), 18);
+    }
+
+    #[test]
+    fn test_lexer_iterator() {
+        let line = "if foo < bar";
+        fn tokenizer(tt: &mut TokenTool) -> Option<Token> {
+            tt.peek().map( |_| Int(tt.count()) )
+        }
+        let results: Vec<_> = tokens_in_line(line, &tokenizer).collect();
+        assert_eq!(results, [(0..12, Int(12))]);
     }
 
 }
