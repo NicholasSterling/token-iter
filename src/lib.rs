@@ -77,8 +77,8 @@
 //!                        "if" => If,
 //!                        s => Ident(s.into())
 //!                    },
-//!             c if c.is_digit(10) =>
-//!                    lx.take_while( |c| c.is_digit(10) ).map( |s|
+//!             c if is_ascii_digit(c) =>
+//!                    lx.take_while(is_ascii_digit).map( |s|
 //!                        if let Ok(n) = s.parse::<usize>() {
 //!                            Int(n)
 //!                        } else {
