@@ -4,20 +4,25 @@
 //! For example, the text "foo < 10" might be tokenized into three tokens:
 //! the identifier "foo", the less-than symbol, and the integer 10.
 //!
+//! Note that a sequence of characters that is considered a unit is called
+//! a "lexeme," and the lexeme gets converted to a token (typically an enum value).
+//! For example, the lexeme "while" might be mapped to a Token::While enum value,
+//! and "731" to Token::Int(731).
+//!
 //! This library was designed with the following principles in mind:
 //!  1. The library should NOT define tokens, or place constraints on how they are represented.
 //!     The library's token type should be an opaque generic parameter, with no type constraints.
 //!  2. The library should NOT have any ideas about how the text is interpreted,
-//!     beyond that a token may not span lines.  For example, the library should not
+//!     beyond that a lexeme may not span lines.  For example, the library should not
 //!     assume that whitespace is insignificant, or have any notion of identifiers
 //!     or numbers.
-//!  3. The decision as to what constitutes a token should be handled in Rust code
+//!  3. The decision as to what constitutes a lexeme should be handled in Rust code
 //!     (rather than, for example, regular expressions).
 //!  4. The API should give you an Iterator over the tokens in an &str,
 //!     or in an Iterator of &str's.
 //!  5. The library should automatically add the line number and column range for a token.
-//!  6. The library should be very efficient.  In particular, it should not allocate
-//!     heap memory for tokens, instead yielding &str's of substrings of the input.
+//!  6. The library should be very efficient.  In particular, it should not allocate heap
+//!     memory for lexemes or tokens, instead yielding &str's of substrings of the input.
 //!     Where a String is required, creating it is left to you (by calling .into()),
 //!     so that heap allocations are only done when really needed.
 //!  7. Invalid tokens are tokens, not errors.  Tokenization shouldn't stop just because
@@ -28,13 +33,13 @@
 //!
 //! To use the library, you must
 //!  1. define a type for your tokens (typically, but not necessarily, an enum)
-//!  2. write a tokenizer function that uses a TokenTool (a type provided by this library)
-//!     to recognize a token and, if necessary, get the token's characters as an &str
+//!  2. write a tokenizer function that uses a Lexer (a type provided by this library)
+//!     to recognize lexemes and convert them to tokens
 //!  3. call either\
 //!     `tokens_in_line(line, &tokenizer)`, if you know your code is a single line, or\
 //!     `tokens_in(line_iter, &tokenizer)`, to get line numbers with the tokens
 //!
-//! Here is a [sequence diagram](https://www.websequencediagrams.com/cgi-bin/cdraw?lz=dGl0bGUgVG9rZW5pemluZyBhIGxpbmUgd2l0aCB0aGUgdG9rZW4taXRlciBjcmF0ZSdzAA0Gc19pbl8AJgVmdW5jdGlvbgpwYXJ0aWNpcGFudCBZT1VSIFBST0dSQU0gYXMgUAARDQAzD2FzIFQAMQ1hbiBJdGVyYXRvciBvdmVyXG4oY29sdW1uIHJhbmdlLACBEAYpIGFzIEkAZRJUT0tFTklaRVIgRm5cbnRoYXQgcmVjb2duaXplc1xuIGFuZCBjcmVhdGUAgUQIIGFzIEYAdA5cbgCCEAVUb29sIGFzIE0KUCAtPisgVDoAgXAPKGxpbmUsICYAgiMFaXplcikKVCAtPi0gUDoAgR8oXG5mb3IgAIEjBQCCdwVvZiBjb2RlAGsHSTogbmV4dCgpCkkAfQVGOiBjYWxscyB5b3VyAIFdBQCDJwVhAIM_BlRvb2wKRgCBJgVNOiB2YXJpb3VzACsGXG50byBmaW5kIGEAg1AGCk0AgSQFRjogACgKYW5kIHBlcmhhcHNcbmdlAIMkByB0ZXh0ACUKdGV4dCBvZgA_B0YAgWoFSTogU29tZSgAgxQGAIElB006IHdoZXJlIHdhcwCBXAU_AG0HSTogAINFDABDCkkAgjQIAEgFAINhFSkAgg8Ka2VlcACBWAZpbmcAgiAHIHVudGlsIC4uLgCBfjNuAIFbDU5vbmUAgVUKAAkFAIEXCQAXBQo&s=earth)
+//! Here is a [sequence diagram](https://www.websequencediagrams.com/cgi-bin/cdraw?lz=dGl0bGUgVG9rZW5pemluZyBhIGxpbmUgd2l0aCB0aGUgdG9rZW4taXRlciBjcmF0ZSdzAA0Gc19pbl8AJgVmdW5jdGlvbgpwYXJ0aWNpcGFudCBZT1VSIFBST0dSQU0gYXMgUAARDQAzD2FzIFQAMQ1hbiBJdGVyYXRvciBvdmVyXG4oY29sdW1uIHJhbmdlLACBEAYpIGFzIEkAZRJUT0tFTklaRVIgRm5cbnRoYXQgcmVjb2duaXplcyBsZXhlbWVzXG4gYW5kIGNyZWF0ZQCBTAggYXMgRgB8DlxuTGV4ZXIgYXMgTQpQIC0-KyBUOgCBdA8obGluZSwgJgCCJwVpemVyKQpUIC0-LSBQOgCBIyhcbmZvciAAgScFAIJ7BW9mIGNvZGUAawdJOiBuZXh0KCkKSQB9BUY6IGNhbGxzIHlvdXIAgWEFAIMrBWEgAIEnBQpGAIEiBU06IHZhcmlvdXMAJwZcbnRvIGZpbmQgYQCBfgcKTQCBIQVGOiAAKQphbmQgcGVyaGFwc1xuZ2V0IGl0cyB0ZXh0ACMKADYHRgCBXgVJOiBTb21lKACDDAYAgRkHTTogd2hlcmUgd2FzAIFQBT8AZAdJOiAAgz0MIG9mAIEDCEkAgikIAEkFAINaFSkAggQKa2VlcACBUQZpbmcAghUHIHVudGlsIC4uLgCBdy9uAIFRDU5vbgCBUQsACQUAgRMJABcFCg&s=earth)
 //! showing how `tokens_in_line` works with your tokenizer function to generate a token.
 //! `tokens_in` runs `tokens_in_line` on each line, flattening the results and adding line numbers.
 //!
@@ -56,25 +61,25 @@
 //!     Unrecognized(char)
 //! }
 //!
-//! // Produces a token, using a TokenTool to examine the characters.
-//! fn tokenizer(tt: &mut TokenTool) -> Option<Token> {
+//! // Produces a token, using a Lexer to examine the characters.
+//! fn tokenizer(l: &mut Lexer) -> Option<Token> {
 //!     use Token::*;
 //!     let is_digit = |c: char| c >= '0' && c <= '9';
 //!     Some(
-//!         match tt.skip_while(char::is_whitespace).next()? {
-//!             '<' => if tt.at('=') {LE} else {LT},
-//!             '>' => if tt.at('=') {GE} else {GT},
-//!             '=' => if tt.at('=') {EQEQ} else {EQ},
+//!         match l.skip_while(char::is_whitespace).next()? {
+//!             '<' => if l.next_is('=') {LE} else {LT},
+//!             '>' => if l.next_is('=') {GE} else {GT},
+//!             '=' => if l.next_is('=') {EQEQ} else {EQ},
 //!             '{' => LCurly,
 //!             '}' => RCurly,
 //!             c if c.is_alphabetic() =>
-//!                    match tt.take_while(char::is_alphanumeric).text() {
+//!                    match l.take_while(char::is_alphanumeric).into() {
 //!                        "while" => While,
 //!                        "if" => If,
 //!                        s => Ident(s.into())
 //!                    },
 //!             c if is_digit(c) =>
-//!                    tt.take_while(is_digit).map( |s|
+//!                    l.take_while(is_digit).map( |s|
 //!                        if let Ok(n) = s.parse::<usize>() {
 //!                            Int(n)
 //!                        } else {
@@ -117,13 +122,13 @@ pub fn tokens_in_line<'a, Str, Token: 'a, Tokenizer>(line: Str, tokenizer: &'a T
                                                      -> impl Iterator<Item = (Range<usize>, Token)> + 'a
 where
     Str: Into<&'a str>,
-    Tokenizer: Fn(&mut TokenTool<'a>) -> Option<Token> + 'a
+    Tokenizer: Fn(&mut Lexer<'a>) -> Option<Token> + 'a
 {
     let line = line.into();
     let mut chars = line.char_indices();
     let next = chars.next();
     StrTokenIterator::<'a, Token, Tokenizer> {
-        tool: TokenTool::<'a> {
+        tool: Lexer::<'a> {
             line,
             chars,
             current: next,
@@ -142,7 +147,7 @@ pub fn tokens_in<'a, Token: 'a, Tokenizer, StrIter, Str>(iter: StrIter, tokenize
 where
     StrIter: Iterator<Item = Str> + 'a,
     Str: Into<&'a str> + 'a,
-    Tokenizer: Fn(&mut TokenTool<'a>) -> Option<Token> + 'a
+    Tokenizer: Fn(&mut Lexer<'a>) -> Option<Token> + 'a
 {
     iter.enumerate().flat_map( |(line_num, line)|
         tokens_in_line(line, tokenizer).map( move |(column_range, token)|
@@ -155,14 +160,14 @@ where
 ///// StrTokenIterator /////////////////////////
 
 struct StrTokenIterator<'a, Token, Tokenizer>
-where Tokenizer: Fn(&mut TokenTool<'a>) -> Option<Token>
+where Tokenizer: Fn(&mut Lexer<'a>) -> Option<Token>
 {
-    tool: TokenTool<'a>,
+    tool: Lexer<'a>,
     tokenizer: &'a Tokenizer
 }
 
 impl<'a, Token, Tokenizer> Iterator for StrTokenIterator<'a, Token, Tokenizer>
-where Tokenizer: Fn(&mut TokenTool<'a>) -> Option<Token>
+where Tokenizer: Fn(&mut Lexer<'a>) -> Option<Token>
 {
     type Item = (Range<usize>, Token);
 
@@ -176,13 +181,13 @@ where Tokenizer: Fn(&mut TokenTool<'a>) -> Option<Token>
 }
 
 
-///// TokenTool /////////////////////////
+///// Lexer /////////////////////////
 
-/// The tokenizer you write will be passed a TokenTool as an argument,
-/// and will call methods on it to figure out what the next token is
-/// and, if needed, get its text.  The TokenTool keeps track of the
-/// column range of the token.
-pub struct TokenTool<'a> {
+/// The tokenizer you write will be passed a Lexer as an argument,
+/// and will call methods on it to figure out what the next lexeme is
+/// and, if needed, get its text.  The Lexer keeps track of the
+/// column range of the lexeme.
+pub struct Lexer<'a> {
     line: &'a str,
     chars: CharIndices<'a>,
     current: Option<(usize, char)>,
@@ -191,9 +196,9 @@ pub struct TokenTool<'a> {
     start_column: usize,
 }
 
-impl<'a> TokenTool<'a> {
+impl<'a> Lexer<'a> {
 
-    /// Adds the current character to the token and advances to the next.
+    /// Adds the current character to the lexeme and advances to the next.
     fn advance(&mut self) {
         if self.current.is_some() {
             self.current = self.chars.next();
@@ -201,17 +206,17 @@ impl<'a> TokenTool<'a> {
         }
     }
 
-    /// Gets the range of columns currently associated with the token.
+    /// Gets the range of columns currently associated with the lexeme.
     fn column_range(&mut self) -> Range<usize> {
         self.start_column .. self.column
     }
 
-    /// Gets the range of the line currently associated with the token.
+    /// Gets the byte range of the line currently associated with the lexeme.
     fn str_range(&mut self) -> Range<usize> {
         self.start_ix .. self.current.map_or_else(|| self.line.len(), |(ix, _)| ix)
     }
 
-    /// Makes the next char of the text the first char of the token.
+    /// Makes the next char the start of the lexeme.
     fn mark_start(&mut self) -> &mut Self {
         if let Some((start_ix, _)) = self.current {
             self.start_ix = start_ix;
@@ -220,7 +225,7 @@ impl<'a> TokenTool<'a> {
         self
     }
 
-    /// Returns the next character and adds it to the token.
+    /// Returns the next character and adds it to the lexeme.
     fn char(&mut self) -> Option<char> {
         self.current.map( |(_, c)| {
             self.advance();
@@ -229,8 +234,8 @@ impl<'a> TokenTool<'a> {
     }
 
     /// If the next character is c (the argument, not the letter),
-    /// adds c to the token and returns true.  Otherwise just returns false.
-    pub fn at(&mut self, c: char) -> bool {
+    /// adds c to the lexeme and returns true.  Otherwise just returns false.
+    pub fn next_is(&mut self, c: char) -> bool {
         if let Some((_, next_c)) = self.current {
             if next_c == c {
                 self.advance();
@@ -245,7 +250,7 @@ impl<'a> TokenTool<'a> {
         self.current.map( |(_, c)| c )
     }
 
-    /// Keeps adding characters to the token while f(char) is true.
+    /// Keeps adding characters to the lexeme while f(char) is true.
     /// Returns self to allow chaining.
     pub fn take_while(&mut self, f: impl Fn(char) -> bool) -> &mut Self {
         while let Some((_, c)) = self.current {
@@ -256,7 +261,7 @@ impl<'a> TokenTool<'a> {
     }
 
     /// Skips over characters while f(char) is true;
-    /// the token will start at the char where f(char) is false.
+    /// the lexeme will start at the char where f(char) is false.
     /// Returns self to allow chaining.
     pub fn skip_while(&mut self, f: impl Fn(char) -> bool) -> &mut Self {
         self.take_while(f);
@@ -264,30 +269,32 @@ impl<'a> TokenTool<'a> {
         self
     }
 
-    /// Returns the text of the token as an &str.
-    pub fn text(&mut self) -> &'a str {
+    /// Returns the lexeme as an &str.
+    pub fn lexeme(&mut self) -> &'a str {
         &self.line[self.str_range()]
     }
 
-    /// Returns the text of the token, converted to the needed type.
-    /// This is just a shortcut for .text().into().
+    /// Returns the lexeme converted to the needed type.
+    /// This is just a shortcut for .lexeme().into().
     pub fn into<T: From<&'a str>>(&mut self) -> T {
-        T::from(self.text())
+        T::from(self.lexeme())
     }
 
-    /// Returns the result of applying f() to the token text.
+    /// Returns the result of applying f() to the lexeme.
     pub fn map<T>(&mut self, f: impl Fn(&'a str) -> T) -> T {
-        f(self.text())
+        f(self.lexeme())
     }
 
-}  // impl TokenTool
+}  // impl Lexer
 
-impl<'a> Iterator for TokenTool<'a> {
+/// A Lexer can iterate through the characters in a line of text.
+impl<'a> Iterator for Lexer<'a> {
     type Item = char;
     fn next(&mut self) -> Option<Self::Item> {
         self.char()
     }
 }
+
 
 
 ///// TESTS /////////////////////////////////////////////////////////////////////////////////////
@@ -296,7 +303,7 @@ impl<'a> Iterator for TokenTool<'a> {
 #[cfg(test)]
 mod test {
 
-    use super::TokenTool;
+    use super::Lexer;
 
     #[derive(Clone, Debug, PartialEq)]
     pub enum Token {
@@ -315,32 +322,32 @@ mod test {
     use Token::*;
     use crate::tokens_in_line;
 
-    fn tokenizer(tt: &mut TokenTool) -> Option<Token> {
+    fn tokenizer(l: &mut Lexer) -> Option<Token> {
         let is_digit = |c: char| c >= '0' && c <= '9';
         Some(
-            match tt.skip_while(char::is_whitespace).next()? {
-                '<' =>  if tt.at('=') {LE} else {LT},
-                '>' =>  if tt.at('=') {GE} else {GT},
-                '=' =>  if tt.at('=') {EQEQ} else {EQ},
+            match l.skip_while(char::is_whitespace).next()? {
+                '<' =>  if l.next_is('=') {LE} else {LT},
+                '>' =>  if l.next_is('=') {GE} else {GT},
+                '=' =>  if l.next_is('=') {EQEQ} else {EQ},
                 '(' =>  LParen,
                 ')' =>  RParen,
                 '{' =>  LCurly,
                 '}' =>  RCurly,
                 c if c.is_alphabetic() =>
-                        match tt.take_while(char::is_alphanumeric).text() {
+                        match l.take_while(char::is_alphanumeric).lexeme() {
                             "if" => If,
                             "while" => While,
-                            text => Ident(text.into()),
+                            s => Ident(s.into()),
                         },
                 c if is_digit(c) =>
-                        tt.take_while(is_digit).map( |it|
+                        l.take_while(is_digit).map( |it|
                             if let Ok(n) = it.parse::<usize>() {
                                 Int(n)
                             } else {
                                 BadInt(it.into())
                             }
                         ),
-                _ => Unrecognized(tt.into())
+                _ => Unrecognized(l.into())
             }
         )
     }
@@ -349,6 +356,18 @@ mod test {
     fn test_empty_str() {
         let next = super::tokens_in_line("", &tokenizer).next();
         assert_eq!(next, None);
+    }
+
+    #[test]
+    fn test_no_whitespace() {
+        let line = "if(foo<=10){x=2}";
+        let expected_tokens = vec![
+            If, LParen, Ident("foo".into()), LE, Int(10), RParen,
+            LCurly, Ident("x".into()), EQ, Int(2), RCurly
+        ];
+        let results: Vec<_> = super::tokens_in_line(line, &tokenizer).collect();
+        let tokens: Vec<_> = results.iter().map( |(_, token)| token.clone() ).collect();
+        assert_eq!(tokens, expected_tokens);
     }
 
     #[test]
@@ -391,15 +410,15 @@ mod test {
     }
 
     #[test]
-    fn test_multibyte() {
+    fn test_multibyte_chars() {
         let line = "关于本网站的";
         // Tokenizer calls     ^    LT, and anything else an Ident.
         // So this should tokenize to Ident < Ident.
-        fn tokenizer(tt: &mut TokenTool) -> Option<Token> {
+        fn tokenizer(l: &mut Lexer) -> Option<Token> {
             Some(
-                match tt.next()? {
+                match l.next()? {
                     '本' => LT,
-                    _ => Ident(tt.take_while( |c| c != '本' ).into())
+                    _ => Ident(l.take_while( |c| c != '本' ).into())
                 }
             )
         }
@@ -414,10 +433,10 @@ mod test {
     }
 
     #[test]
-    fn test_lexer_iterator() {
+    fn test_tool_iterator() {
         let line = "if foo < bar";
-        fn tokenizer(tt: &mut TokenTool) -> Option<Token> {
-            tt.peek().map( |_| Int(tt.count()) )
+        fn tokenizer(l: &mut Lexer) -> Option<Token> {
+            l.peek().map( |_| Int(l.count()) )
         }
         let results: Vec<_> = tokens_in_line(line, &tokenizer).collect();
         assert_eq!(results, [(0..12, Int(12))]);
