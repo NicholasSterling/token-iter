@@ -52,7 +52,7 @@
 //! enum Token {
 //!     LT, LE,                 // < <=
 //!     GT, GE,                 // > >=
-//!     EQEQ, EQ,               // == =
+//!     EqEq, EQ,               // == =
 //!     LCurly, RCurly,         // { }
 //!     While, If,
 //!     Ident(String),          // e.g. foo12
@@ -62,24 +62,23 @@
 //! }
 //!
 //! // Produces a token, using a Lexer to examine the characters.
-//! fn tokenizer(l: &mut Lexer) -> Option<Token> {
+//! fn tokenizer(lx: &mut Lexer) -> Option<Token> {
 //!     use Token::*;
-//!     let is_digit = |c: char| c >= '0' && c <= '9';
 //!     Some(
-//!         match l.skip_while(char::is_whitespace).next()? {
-//!             '<' => if l.next_is('=') {LE} else {LT},
-//!             '>' => if l.next_is('=') {GE} else {GT},
-//!             '=' => if l.next_is('=') {EQEQ} else {EQ},
+//!         match lx.ignore(char::is_whitespace).next()? {
+//!             '<' => if lx.at('=') {LE} else {LT},
+//!             '>' => if lx.at('=') {GE} else {GT},
+//!             '=' => if lx.at('=') {EqEq} else {EQ},
 //!             '{' => LCurly,
 //!             '}' => RCurly,
 //!             c if c.is_alphabetic() =>
-//!                    match l.take_while(char::is_alphanumeric).into() {
+//!                    match lx.take_while(char::is_alphanumeric).lexeme() {
 //!                        "while" => While,
 //!                        "if" => If,
 //!                        s => Ident(s.into())
 //!                    },
-//!             c if is_digit(c) =>
-//!                    l.take_while(is_digit).map( |s|
+//!             c if c.is_digit(10) =>
+//!                    lx.take_while( |c| c.is_digit(10) ).map( |s|
 //!                        if let Ok(n) = s.parse::<usize>() {
 //!                            Int(n)
 //!                        } else {
@@ -207,12 +206,12 @@ impl<'a> Lexer<'a> {
     }
 
     /// Gets the range of columns currently associated with the lexeme.
-    fn column_range(&mut self) -> Range<usize> {
+    fn column_range(&self) -> Range<usize> {
         self.start_column .. self.column
     }
 
     /// Gets the byte range of the line currently associated with the lexeme.
-    fn str_range(&mut self) -> Range<usize> {
+    fn str_range(&self) -> Range<usize> {
         self.start_ix .. self.current.map_or_else(|| self.line.len(), |(ix, _)| ix)
     }
 
@@ -235,7 +234,7 @@ impl<'a> Lexer<'a> {
 
     /// If the next character is c (the argument, not the letter),
     /// adds c to the lexeme and returns true.  Otherwise just returns false.
-    pub fn next_is(&mut self, c: char) -> bool {
+    pub fn at(&mut self, c: char) -> bool {
         if let Some((_, next_c)) = self.current {
             if next_c == c {
                 self.advance();
@@ -263,14 +262,14 @@ impl<'a> Lexer<'a> {
     /// Skips over characters while f(char) is true;
     /// the lexeme will start at the char where f(char) is false.
     /// Returns self to allow chaining.
-    pub fn skip_while(&mut self, f: impl Fn(char) -> bool) -> &mut Self {
+    pub fn ignore(&mut self, f: impl Fn(char) -> bool) -> &mut Self {
         self.take_while(f);
         self.mark_start();
         self
     }
 
     /// Returns the lexeme as an &str.
-    pub fn lexeme(&mut self) -> &'a str {
+    pub fn lexeme(&self) -> &'a str {
         &self.line[self.str_range()]
     }
 
@@ -309,7 +308,7 @@ mod test {
     pub enum Token {
         LT, LE,                 // < <=
         GT, GE,                 // > >=
-        EQ, EQEQ,               // = ==
+        EQ, EqEq,               // = ==
         LParen, RParen,         // ( )
         LCurly, RCurly,         // { }
         If,                     // if
@@ -323,12 +322,11 @@ mod test {
     use crate::tokens_in_line;
 
     fn tokenizer(l: &mut Lexer) -> Option<Token> {
-        let is_digit = |c: char| c >= '0' && c <= '9';
         Some(
-            match l.skip_while(char::is_whitespace).next()? {
-                '<' =>  if l.next_is('=') {LE} else {LT},
-                '>' =>  if l.next_is('=') {GE} else {GT},
-                '=' =>  if l.next_is('=') {EQEQ} else {EQ},
+            match l.ignore(char::is_whitespace).next()? {
+                '<' =>  if l.at('=') {LE} else {LT},
+                '>' =>  if l.at('=') {GE} else {GT},
+                '=' =>  if l.at('=') {EqEq} else {EQ},
                 '(' =>  LParen,
                 ')' =>  RParen,
                 '{' =>  LCurly,
@@ -339,8 +337,8 @@ mod test {
                             "while" => While,
                             s => Ident(s.into()),
                         },
-                c if is_digit(c) =>
-                        l.take_while(is_digit).map( |it|
+                c if c.is_digit(10) =>
+                        l.take_while( |c| c.is_digit(10) ).map( |it|
                             if let Ok(n) = it.parse::<usize>() {
                                 Int(n)
                             } else {
@@ -433,7 +431,7 @@ mod test {
     }
 
     #[test]
-    fn test_tool_iterator() {
+    fn test_lexer_as_iterator() {
         let line = "if foo < bar";
         fn tokenizer(l: &mut Lexer) -> Option<Token> {
             l.peek().map( |_| Int(l.count()) )
