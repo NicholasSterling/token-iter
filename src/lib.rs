@@ -56,7 +56,7 @@
 //!     LCurly, RCurly,         // { }
 //!     While, If,
 //!     Ident(String),          // e.g. foo12
-//!     Int(usize),             // e.g. 273
+//!     Int(u64),               // e.g. 273
 //!     BadInt(String),         // e.g. 9873487239482398477132498723423987234
 //!     Unrecognized(char)
 //! }
@@ -64,6 +64,7 @@
 //! // Produces a token, using a Lexer to examine the characters.
 //! fn tokenizer(lx: &mut Lexer) -> Option<Token> {
 //!     use Token::*;
+//!     let is_digit = |c| char::is_ascii_digit(&c);
 //!     Some(
 //!         match lx.ignore(char::is_whitespace).next()? {
 //!             '<' => if lx.at('=') {LE} else {LT},
@@ -77,9 +78,9 @@
 //!                        "if" => If,
 //!                        s => Ident(s.into())
 //!                    },
-//!             c if is_ascii_digit(c) =>
-//!                    lx.take_while(is_ascii_digit).map( |s|
-//!                        if let Ok(n) = s.parse::<usize>() {
+//!             c if is_digit(c) =>
+//!                    lx.take_while(is_digit).map( |s|
+//!                        if let Ok(n) = s.parse::<u64>() {
 //!                            Int(n)
 //!                        } else {
 //!                            BadInt(s.into())
@@ -287,6 +288,8 @@ impl<'a> Lexer<'a> {
 }  // impl Lexer
 
 /// A Lexer can iterate through the characters in a line of text.
+/// However, you probably won't find the regular Iterator methods
+/// useful.
 impl<'a> Iterator for Lexer<'a> {
     type Item = char;
     fn next(&mut self) -> Option<Self::Item> {
