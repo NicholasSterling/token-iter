@@ -1,6 +1,7 @@
 use token_iter::*;
 
 #[derive(Clone, Debug, PartialEq)]
+#[rustfmt::skip]
 pub enum Token {
     LT, LE,                 // < <=
     GT, GE,                 // > >=
@@ -10,12 +11,13 @@ pub enum Token {
     If,                     // if
     While,                  // while
     Ident(String),          // e.g. foo
-    Int(usize),               // e.g. 273
+    Int(usize),             // e.g. 273
     BadInt(String),         // e.g. 9873487239482398472498723423987234
     Unrecognized(String),   // e.g. @
 }
 use Token::*;
 
+#[rustfmt::skip]
 fn tokenizer(l: &mut Lexer) -> Option<Token> {
     Some(
         match l.ignore(char::is_whitespace).next()? {
@@ -54,37 +56,43 @@ fn test_empty_str() {
 #[test]
 fn test_no_whitespace() {
     let line = "if(foo<=10){x=2}";
+    #[rustfmt::skip]
     let expected_tokens = vec![
         If, LParen, Ident("foo".into()), LE, Int(10), RParen,
         LCurly, Ident("x".into()), EQ, Int(2), RCurly
     ];
     let results: Vec<_> = tokens_in_line(line, &tokenizer).collect();
-    let tokens: Vec<_> = results.iter().map( |(_, token)| token.clone() ).collect();
+    let tokens: Vec<_> = results.iter().map(|(_, token)| token.clone()).collect();
     assert_eq!(tokens, expected_tokens);
 }
 
 #[test]
 fn test_lots_of_whitespace() {
     let line = "  if ( foo <= 10 ) \n  { x = 2 }  ";
+    #[rustfmt::skip]
     let expected_tokens = vec![
         If, LParen, Ident("foo".into()), LE, Int(10), RParen,
         LCurly, Ident("x".into()), EQ, Int(2), RCurly
     ];
     let results: Vec<_> = tokens_in_line(line, &tokenizer).collect();
-    let tokens: Vec<_> = results.iter().map( |(_, token)| token.clone() ).collect();
+    let tokens: Vec<_> = results.iter().map(|(_, token)| token.clone()).collect();
     assert_eq!(tokens, expected_tokens);
 }
 
 #[test]
 fn test_multiline() {
     let code = "\n\nif (foo<=10) {x=2}";
+    #[rustfmt::skip]
     let expected_tokens = vec![
         If, LParen, Ident("foo".into()), LE, Int(10), RParen,
         LCurly, Ident("x".into()), EQ, Int(2), RCurly
     ];
     let results: Vec<_> = tokens_in(code.lines(), &tokenizer).collect();
-    assert!(results.iter().all( |(line, _, _)| *line == 2));
-    let tokens: Vec<_> = results.iter().map( |(_, _, token)| (*token).clone() ).collect();
+    assert!(results.iter().all(|(line, _, _)| *line == 2));
+    let tokens: Vec<_> = results
+        .iter()
+        .map(|(_, _, token)| (*token).clone())
+        .collect();
     assert_eq!(tokens, expected_tokens);
 }
 
@@ -96,7 +104,7 @@ fn test_line_and_column() {
         (1, 4..7, Ident("foo".into())),
         (1, 8..9, EQ),
         (1, 10..11, Int(2)),
-        (2, 0..1, RCurly)
+        (2, 0..1, RCurly),
     ];
     let results: Vec<_> = tokens_in(code.lines(), &tokenizer).collect();
     assert_eq!(results, expected_results);
@@ -107,13 +115,11 @@ fn test_multibyte_chars() {
     let line = "关于本网站的";
     // Tokenizer calls     ^    LT, and anything else an Ident.
     // So this should tokenize to Ident < Ident.
-    fn tokenizer(l: &mut Lexer) -> Option<Token> {
-        Some(
-            match l.next()? {
-                '本' => LT,
-                _ => Ident(l.take_while( |c| c != '本' ).into())
-            }
-        )
+    fn tokenizer(lx: &mut Lexer) -> Option<Token> {
+        Some(match lx.next()? {
+            '本' => LT,
+            _ => Ident(lx.take_while(|c| c != '本').into()),
+        })
     }
     let results: Vec<_> = tokens_in_line(line, &tokenizer).collect();
     let expected_results = [
@@ -128,9 +134,9 @@ fn test_multibyte_chars() {
 #[test]
 fn test_lexer_as_iterator() {
     let line = "if foo < bar";
-    fn tokenizer(l: &mut Lexer) -> Option<Token> {
-                                               l.peek().map( |_| Int(l.count()) )
-                                                                                 }
+    fn tokenizer(lx: &mut Lexer) -> Option<Token> {
+        lx.peek().map(|_| Int(lx.count()))
+    }
     let results: Vec<_> = tokens_in_line(line, &tokenizer).collect();
     assert_eq!(results, [(0..12, Int(12))]);
 }

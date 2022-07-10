@@ -118,68 +118,70 @@ use std::str::CharIndices;
 
 /// Returns an Iterator over the tokens found in the specified line,
 /// along with their column ranges.  Column numbers start at 0.
-pub fn tokens_in_line<'a, Str, Token: 'a, Tokenizer>(line: Str, tokenizer: &'a Tokenizer)
-                                                     -> impl Iterator<Item = (Range<usize>, Token)> + 'a
+pub fn tokens_in_line<'a, Str, Token: 'a, Tokenizer>(
+    line: Str,
+    tokenizer: &'a Tokenizer,
+) -> impl Iterator<Item = (Range<usize>, Token)> + 'a
 where
     Str: Into<&'a str>,
-    Tokenizer: Fn(&mut Lexer<'a>) -> Option<Token> + 'a
+    Tokenizer: Fn(&mut Lexer<'a>) -> Option<Token> + 'a,
 {
     let line = line.into();
     let mut chars = line.char_indices();
     let next = chars.next();
     StrTokenIterator::<'a, Token, Tokenizer> {
-        tool: Lexer::<'a> {
+        lexer: Lexer::<'a> {
             line,
             chars,
             current: next,
             column: 0,
             start_ix: 0,
-            start_column: 0
+            start_column: 0,
         },
-        tokenizer
+        tokenizer,
     }
 }
 
 /// Returns an Iterator over the tokens found in the specified lines,
 /// along with their line numbers and column ranges (both of which start at 0).
-pub fn tokens_in<'a, Token: 'a, Tokenizer, StrIter, Str>(iter: StrIter, tokenizer: &'a Tokenizer)
-                                                                     -> impl Iterator<Item = (usize, Range<usize>, Token)> + 'a
+pub fn tokens_in<'a, Token: 'a, Tokenizer, StrIter, Str>(
+    iter: StrIter,
+    tokenizer: &'a Tokenizer,
+) -> impl Iterator<Item = (usize, Range<usize>, Token)> + 'a
 where
     StrIter: Iterator<Item = Str> + 'a,
     Str: Into<&'a str> + 'a,
-    Tokenizer: Fn(&mut Lexer<'a>) -> Option<Token> + 'a
+    Tokenizer: Fn(&mut Lexer<'a>) -> Option<Token> + 'a,
 {
-    iter.enumerate().flat_map( |(line_num, line)|
-        tokens_in_line(line, tokenizer).map( move |(column_range, token)|
-            (line_num, column_range, token)
-        )
-    )
+    iter.enumerate().flat_map(|(line_num, line)| {
+        tokens_in_line(line, tokenizer)
+            .map(move |(column_range, token)| (line_num, column_range, token))
+    })
 }
-
 
 ///// StrTokenIterator /////////////////////////
 
 struct StrTokenIterator<'a, Token, Tokenizer>
-where Tokenizer: Fn(&mut Lexer<'a>) -> Option<Token>
+where
+    Tokenizer: Fn(&mut Lexer<'a>) -> Option<Token>,
 {
-    tool: Lexer<'a>,
-    tokenizer: &'a Tokenizer
+    lexer: Lexer<'a>,
+    tokenizer: &'a Tokenizer,
 }
 
 impl<'a, Token, Tokenizer> Iterator for StrTokenIterator<'a, Token, Tokenizer>
-where Tokenizer: Fn(&mut Lexer<'a>) -> Option<Token>
+where
+    Tokenizer: Fn(&mut Lexer<'a>) -> Option<Token>,
 {
     type Item = (Range<usize>, Token);
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.tool.current.and_then( |_|
-            (self.tokenizer)(self.tool.mark_start()).map( |token|
-                (self.tool.column_range(), token)
-            )
-        )
+        self.lexer.current.and_then(|_| {
+            (self.tokenizer)(self.lexer.mark_start())
+                .map(|token| (self.lexer.column_range(), token))
+        })
     }
 }
-
 
 ///// Lexer /////////////////////////
 
@@ -197,7 +199,6 @@ pub struct Lexer<'a> {
 }
 
 impl<'a> Lexer<'a> {
-
     /// Adds the current character to the lexeme and advances to the next.
     fn advance(&mut self) {
         if self.current.is_some() {
@@ -208,12 +209,12 @@ impl<'a> Lexer<'a> {
 
     /// Gets the range of columns currently associated with the lexeme.
     fn column_range(&self) -> Range<usize> {
-        self.start_column .. self.column
+        self.start_column..self.column
     }
 
     /// Gets the byte range of the line currently associated with the lexeme.
     fn str_range(&self) -> Range<usize> {
-        self.start_ix .. self.current.map_or_else(|| self.line.len(), |(ix, _)| ix)
+        self.start_ix..self.current.map_or_else(|| self.line.len(), |(ix, _)| ix)
     }
 
     /// Makes the next char the start of the lexeme.
@@ -227,7 +228,7 @@ impl<'a> Lexer<'a> {
 
     /// Returns the next character and adds it to the lexeme.
     fn char(&mut self) -> Option<char> {
-        self.current.map( |(_, c)| {
+        self.current.map(|(_, c)| {
             self.advance();
             c
         })
@@ -247,14 +248,16 @@ impl<'a> Lexer<'a> {
 
     /// Returns the next character without advancing.
     pub fn peek(&self) -> Option<char> {
-        self.current.map( |(_, c)| c )
+        self.current.map(|(_, c)| c)
     }
 
     /// Keeps adding characters to the lexeme while f(char) is true.
     /// Returns self to allow chaining.
     pub fn take_while(&mut self, f: impl Fn(char) -> bool) -> &mut Self {
         while let Some((_, c)) = self.current {
-            if !f(c) { break; }
+            if !f(c) {
+                break;
+            }
             self.advance();
         }
         self
@@ -284,8 +287,7 @@ impl<'a> Lexer<'a> {
     pub fn map<T>(&mut self, f: impl Fn(&'a str) -> T) -> T {
         f(self.get())
     }
-
-}  // impl Lexer
+} // impl Lexer
 
 /// A Lexer can iterate through the characters in a line of text.
 /// However, you probably won't find the regular Iterator methods
