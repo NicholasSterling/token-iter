@@ -19,6 +19,7 @@ use Token::*;
 
 #[rustfmt::skip]
 fn tokenizer(l: &mut Lexer) -> Option<Token> {
+    let is_digit = |c| char::is_ascii_digit(&c);
     Some(
         match l.ignore(char::is_whitespace).next()? {
             '<' =>  if l.at('=') {LE} else {LT},
@@ -34,8 +35,8 @@ fn tokenizer(l: &mut Lexer) -> Option<Token> {
                         "while" => While,
                         s => Ident(s.into()),
                     },
-            c if c.is_digit(10) =>
-                    l.take_while( |c| c.is_digit(10) ).map( |it|
+            c if is_digit(c) =>
+                    l.take_while(is_digit).map( |it|
                         if let Ok(n) = it.parse::<usize>() {
                             Int(n)
                         } else {
