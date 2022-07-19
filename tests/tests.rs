@@ -21,7 +21,7 @@ use Token::*;
 fn tokenizer(l: &mut Lexer) -> Option<Token> {
     let is_digit = |c| char::is_ascii_digit(&c);
     Some(
-        match l.ignore(char::is_whitespace).next()? {
+        match l.skip_while(char::is_whitespace).next()? {
             '<' =>  if l.at('=') {LE} else {LT},
             '>' =>  if l.at('=') {GE} else {GT},
             '=' =>  if l.at('=') {EqEq} else {EQ},
@@ -130,14 +130,4 @@ fn test_multibyte_chars() {
     ];
     assert_eq!(results, expected_results);
     assert_eq!(line.len(), 18);
-}
-
-#[test]
-fn test_lexer_as_iterator() {
-    let line = "if foo < bar";
-    fn tokenizer(lx: &mut Lexer) -> Option<Token> {
-        lx.peek().map(|_| Int(lx.count()))
-    }
-    let results: Vec<_> = tokens_in_line(line, &tokenizer).collect();
-    assert_eq!(results, [(0..12, Int(12))]);
 }

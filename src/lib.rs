@@ -228,7 +228,7 @@ impl<'a> Lexer<'a> {
 
     /// Returns the next character and adds it to the lexeme.
     // #[allow(clippy::)]
-    fn next(&mut self) -> Option<char> {
+    pub fn next(&mut self) -> Option<char> {
         self.current.map(|(_, c)| {
             self.advance();
             c
