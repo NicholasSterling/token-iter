@@ -66,7 +66,7 @@
 //!     use Token::*;
 //!     let is_digit = |c| char::is_ascii_digit(&c);
 //!     Some(
-//!         match lx.ignore(char::is_whitespace).next()? {
+//!         match lx.skip_while(char::is_whitespace).next()? {
 //!             '<' => if lx.at('=') {LE} else {LT},
 //!             '>' => if lx.at('=') {GE} else {GT},
 //!             '=' => if lx.at('=') {EqEq} else {EQ},
@@ -227,7 +227,8 @@ impl<'a> Lexer<'a> {
     }
 
     /// Returns the next character and adds it to the lexeme.
-    fn char(&mut self) -> Option<char> {
+    // #[allow(clippy::)]
+    fn next(&mut self) -> Option<char> {
         self.current.map(|(_, c)| {
             self.advance();
             c
@@ -266,7 +267,7 @@ impl<'a> Lexer<'a> {
     /// Skips over characters while f(char) is true;
     /// the lexeme will start at the char where f(char) is false.
     /// Returns self to allow chaining.
-    pub fn ignore(&mut self, f: impl Fn(char) -> bool) -> &mut Self {
+    pub fn skip_while(&mut self, f: impl Fn(char) -> bool) -> &mut Self {
         self.take_while(f);
         self.mark_start();
         self
@@ -277,7 +278,7 @@ impl<'a> Lexer<'a> {
         &self.line[self.str_range()]
     }
 
-    /// Returns the lexeme converted to the needed type.
+    /// Returns the lexeme converted to the needed type (commonly a String).
     /// This is just a shortcut for .lexeme().into().
     pub fn into<T: From<&'a str>>(&mut self) -> T {
         T::from(self.get())
@@ -288,13 +289,3 @@ impl<'a> Lexer<'a> {
         f(self.get())
     }
 } // impl Lexer
-
-/// A Lexer can iterate through the characters in a line of text.
-/// However, you probably won't find the regular Iterator methods
-/// useful.
-impl<'a> Iterator for Lexer<'a> {
-    type Item = char;
-    fn next(&mut self) -> Option<Self::Item> {
-        self.char()
-    }
-}
