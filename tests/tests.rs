@@ -18,32 +18,32 @@ pub enum Token {
 use Token::*;
 
 #[rustfmt::skip]
-fn tokenizer(l: &mut Lexer) -> Option<Token> {
+fn tokenizer(lx: &mut Lexer) -> Option<Token> {
     let is_digit = |c| char::is_ascii_digit(&c);
     Some(
-        match l.skip_while(char::is_whitespace).next()? {
-            '<' =>  if l.at('=') {LE} else {LT},
-            '>' =>  if l.at('=') {GE} else {GT},
-            '=' =>  if l.at('=') {EqEq} else {EQ},
+        match lx.skip_while(char::is_whitespace).next()? {
+            '<' =>  if lx.at('=') {LE} else {LT},
+            '>' =>  if lx.at('=') {GE} else {GT},
+            '=' =>  if lx.at('=') {EqEq} else {EQ},
             '(' =>  LParen,
             ')' =>  RParen,
             '{' =>  LCurly,
             '}' =>  RCurly,
             c if c.is_alphabetic() =>
-                    match l.take_while(char::is_alphanumeric).get() {
+                    match lx.take_while(char::is_alphanumeric).get() {
                         "if" => If,
                         "while" => While,
                         s => Ident(s.into()),
                     },
             c if is_digit(c) =>
-                    l.take_while(is_digit).map( |it|
+                    lx.take_while(is_digit).map( |it|
                         if let Ok(n) = it.parse::<usize>() {
                             Int(n)
                         } else {
                             BadInt(it.into())
                         }
                     ),
-            _ => Unrecognized(l.into())
+            _ => Unrecognized(lx.into())
         }
     )
 }

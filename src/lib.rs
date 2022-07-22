@@ -200,6 +200,7 @@ pub struct Lexer<'a> {
 
 impl<'a> Lexer<'a> {
     /// Adds the current character to the lexeme and advances to the next.
+    #[inline]
     fn advance(&mut self) {
         if self.current.is_some() {
             self.current = self.chars.next();
