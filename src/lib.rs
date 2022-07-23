@@ -236,6 +236,11 @@ impl<'a> Lexer<'a> {
         })
     }
 
+    /// Returns the next character without advancing.
+    pub fn peek(&self) -> Option<char> {
+        self.current.map(|(_, c)| c)
+    }
+
     /// If the next character is c (the argument, not the letter),
     /// adds c to the lexeme and returns true.  Otherwise just returns false.
     pub fn at(&mut self, c: char) -> bool {
@@ -246,11 +251,6 @@ impl<'a> Lexer<'a> {
             }
         }
         false
-    }
-
-    /// Returns the next character without advancing.
-    pub fn peek(&self) -> Option<char> {
-        self.current.map(|(_, c)| c)
     }
 
     /// Keeps adding characters to the lexeme while f(char) is true.
