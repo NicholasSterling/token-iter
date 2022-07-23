@@ -124,7 +124,7 @@ pub fn tokens_in_line<'a, Str, Token: 'a, Tokenizer>(
 ) -> impl Iterator<Item = (Range<usize>, Token)> + 'a
 where
     Str: Into<&'a str>,
-    Tokenizer: Fn(&mut Lexer<'a>) -> Option<Token> + 'a,
+    Tokenizer: Fn(&mut Lexer<'a>) -> Option<Token>,
 {
     let line = line.into();
     let mut chars = line.char_indices();
@@ -151,7 +151,7 @@ pub fn tokens_in<'a, Token: 'a, Tokenizer, StrIter, Str>(
 where
     StrIter: Iterator<Item = Str> + 'a,
     Str: Into<&'a str> + 'a,
-    Tokenizer: Fn(&mut Lexer<'a>) -> Option<Token> + 'a,
+    Tokenizer: Fn(&mut Lexer<'a>) -> Option<Token>,
 {
     iter.enumerate().flat_map(|(line_num, line)| {
         tokens_in_line(line, tokenizer)
