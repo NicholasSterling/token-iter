@@ -211,16 +211,6 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    /// Gets the range of columns currently associated with the lexeme.
-    fn column_range(&self) -> Range<usize> {
-        self.start_column..self.column
-    }
-
-    /// Gets the byte range of the line currently associated with the lexeme.
-    fn str_range(&self) -> Range<usize> {
-        self.start_ix..self.current.map_or_else(|| self.line.len(), |(ix, _)| ix)
-    }
-
     /// Makes the next char the start of the lexeme.
     fn mark_start(&mut self) -> &mut Self {
         if let Some((start_ix, _)) = self.current {
@@ -291,5 +281,15 @@ impl<'a> Lexer<'a> {
     /// Returns the result of applying f() to the lexeme.
     pub fn map<T>(&mut self, f: impl Fn(&'a str) -> T) -> T {
         f(self.get())
+    }
+
+    /// Gets the range of columns associated with the lexeme.
+    pub fn column_range(&self) -> Range<usize> {
+        self.start_column..self.column
+    }
+
+    /// Gets the byte range of the line associated with the lexeme.
+    pub fn str_range(&self) -> Range<usize> {
+        self.start_ix..self.current.map_or_else(|| self.line.len(), |(ix, _)| ix)
     }
 } // impl Lexer
