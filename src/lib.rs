@@ -3,7 +3,7 @@
 //! This crate makes it easier to write tokenizers for textual languages.
 //! A tokenizer takes a sequence of characters as input and produces a sequence
 //! of "tokens" -- instances of some type that categorizes groups of characters.
-//! For example, the text "foo < 10" might be tokenized into three tokens:
+//! For example, the text "foo < 10" might be tokenized into three tokens representing
 //! the identifier "foo", the less-than symbol, and the integer 10.
 //!
 //! Note that a sequence of characters that is considered a unit is called
@@ -16,23 +16,23 @@
 //!     The library's token type should be an opaque generic parameter, with no type constraints.
 //!  2. The library should NOT have any ideas about how the text is interpreted,
 //!     beyond that a lexeme may not span lines.  For example, the library should not
-//!     assume that whitespace is insignificant, or have any notion of identifiers
-//!     or numbers.
-//!  3. The decision as to what constitutes a lexeme should be handled in Rust code
+//!     assume that whitespace is insignificant, have any notion of identifiers
+//!     or numbers, or limit line length.
+//!  3. The logic deciding what constitutes a lexeme should be expressed in Rust code
 //!     (rather than, for example, regular expressions).
 //!  4. The API should give you an Iterator over the tokens in an &str,
 //!     or in an Iterator of &str's.
 //!  5. The library should automatically add the line number and column range for a token.
-//!  6. The library should be very efficient.  In particular, it should not allocate heap
-//!     memory for lexemes or tokens, instead yielding &str's of substrings of the input.
-//!     Where a String is required, creating it is left to you (by calling .into()),
-//!     so that heap allocations are only done when really needed.  The library itself
-//!     should be no_std, so it can be used in small embedded systems.
-//!  7. Invalid tokens are tokens, not errors.  Tokenization shouldn't stop just because
+//!  6. The library should be very time-efficient.
+//!  7. The library should be no_std and have no dependencies.
+//!     In particular, it should not allocate heap memory for lexemes,
+//!     instead yielding &str's of substrings of the input.
+//!  8. Invalid tokens are tokens, not errors.  Tokenization shouldn't stop just because
 //!     it doesn't recognize something.  And you want the same line/column info for bad tokens
 //!     as you do for good ones.  So the tokenizer just produces tokens, not Results that
 //!     contain either a token or an error.
-//!  8. It should all work with multibyte characters.
+//!  9. The library should work with multibyte characters.
+//! 10. The API should support a functional programming style.
 //!
 //! To use the library, you must
 //!  1. define a type for your tokens (typically, but not necessarily, an enum)
