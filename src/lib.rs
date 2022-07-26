@@ -1,3 +1,5 @@
+#![no_std]
+
 //! This crate makes it easier to write tokenizers for textual languages.
 //! A tokenizer takes a sequence of characters as input and produces a sequence
 //! of "tokens" -- instances of some type that categorizes groups of characters.
@@ -24,7 +26,8 @@
 //!  6. The library should be very efficient.  In particular, it should not allocate heap
 //!     memory for lexemes or tokens, instead yielding &str's of substrings of the input.
 //!     Where a String is required, creating it is left to you (by calling .into()),
-//!     so that heap allocations are only done when really needed.
+//!     so that heap allocations are only done when really needed.  The library itself
+//!     should be no_std, so it can be used in small embedded systems.
 //!  7. Invalid tokens are tokens, not errors.  Tokenization shouldn't stop just because
 //!     it doesn't recognize something.  And you want the same line/column info for bad tokens
 //!     as you do for good ones.  So the tokenizer just produces tokens, not Results that
@@ -55,7 +58,7 @@
 //!     EqEq, EQ,               // == =
 //!     LCurly, RCurly,         // { }
 //!     While, If,
-//!     Ident(String),          // e.g. foo12
+//!     Identifier(String),     // e.g. foo12
 //!     Int(u64),               // e.g. 273
 //!     BadInt(String),         // e.g. 9873487239482398477132498723423987234
 //!     Unrecognized(char)
@@ -76,7 +79,7 @@
 //!                    match lx.take_while(char::is_alphanumeric).get() {
 //!                        "while" => While,
 //!                        "if" => If,
-//!                        s => Ident(s.into())
+//!                        s => Identifier(s.into())
 //!                    },
 //!             c if is_digit(c) =>
 //!                    lx.take_while(is_digit).map( |s|
@@ -103,18 +106,18 @@
 //! }
 //!
 //! // On line 1 at columns 8..10: If
-//! // On line 1 at columns 11..14: Ident("foo")
+//! // On line 1 at columns 11..14: Identifier("foo")
 //! // On line 1 at columns 15..16: GT
-//! // On line 1 at columns 17..20: Ident("bar")
+//! // On line 1 at columns 17..20: Identifier("bar")
 //! // On line 1 at columns 21..22: LCurly
-//! // On line 2 at columns 12..15: Ident("foo")
+//! // On line 2 at columns 12..15: Identifier("foo")
 //! // On line 2 at columns 16..17: EQ
 //! // On line 2 at columns 18..19: Int(1)
 //! // On line 3 at columns 8..9: RCurly
 //! ```
 
-use std::ops::Range;
-use std::str::CharIndices;
+use core::ops::Range;
+use core::str::CharIndices;
 
 /// Returns an Iterator over the tokens found in the specified line,
 /// along with their column ranges.  Column numbers start at 0.
