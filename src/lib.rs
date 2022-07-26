@@ -101,7 +101,7 @@
 //!         }
 //!     "#;
 //!     for (line_num, col_range, token) in tokens_in(code.lines(), &tokenizer) {
-//!        println!("On line {line_num} at columns {col_range:?}: {token:?}");
+//!         println!("On line {line_num} at columns {col_range:?}: {token:?}");
 //!     }
 //! }
 //!

@@ -2,6 +2,7 @@ use token_iter::*;
 
 // A type for the tokens.
 #[derive(Clone, Debug, PartialEq)]
+#[rustfmt::skip]
 enum Token {
     LT, LE,                 // < <=
     GT, GE,                 // > >=
@@ -15,6 +16,7 @@ enum Token {
 }
 
 // Produces a token, using a Lexer to examine the characters.
+#[rustfmt::skip]
 fn tokenizer(lx: &mut Lexer) -> Option<Token> {
     use Token::*;
     let is_digit = |c| char::is_ascii_digit(&c);
@@ -51,7 +53,7 @@ fn main() {
         }
     "#;
     for (line_num, col_range, token) in tokens_in(code.lines(), &tokenizer) {
-       println!("On line {line_num} at columns {col_range:?}: {token:?}");
+        println!("On line {line_num} at columns {col_range:?}: {token:?}");
     }
 }
 
