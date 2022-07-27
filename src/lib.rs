@@ -213,10 +213,12 @@ impl<'a> Lexer<'a> {
 
     /// Makes the next char the start of the lexeme.
     fn mark_start(&mut self) -> &mut Self {
-        if let Some((start_ix, _)) = self.current {
-            self.start_ix = start_ix;
-            self.start_column = self.column;
-        }
+        self.start_column = self.column;
+        self.start_ix = if let Some((start_ix, _)) = self.current {
+            start_ix
+        } else {
+            self.line.len()
+        };
         self
     }
 
@@ -284,12 +286,25 @@ impl<'a> Lexer<'a> {
     }
 
     /// Gets the range of columns associated with the lexeme.
+    /// You probably won't need to use this, since the column range is included
+    /// in the Iterator's output, but it could be useful if the interpretation
+    /// of lexemes depends upon the columns in which you find them.
     pub fn column_range(&self) -> Range<usize> {
         self.start_column..self.column
     }
 
     /// Gets the byte range of the line associated with the lexeme.
+    /// You probably won't need to use this, since .get() gives you the &str
+    /// for the lexeme, but it could be useful if the interpretation of lexemes
+    /// depends on the surrounding text.
     pub fn str_range(&self) -> Range<usize> {
         self.start_ix..self.current.map_or_else(|| self.line.len(), |(ix, _)| ix)
+    }
+
+    /// Returns the line we are currently tokenizing.
+    /// You probably won't need to use this, but it could be useful if the
+    /// interpretation of lexemes depends on the surrounding text.
+    pub fn line(&self) -> &str {
+        self.line
     }
 } // impl Lexer

@@ -112,6 +112,21 @@ fn test_line_and_column() {
 }
 
 #[test]
+fn test_line() {
+    let code = "a b c d\nd e f";
+    fn tokenizer(lx: &mut Lexer) -> Option<Token> {
+        lx.skip_while( |_| true );
+        Some(Int(lx.line().len()))
+    }
+    let expected_results = vec![
+        (0, 7..7, Int(7)),
+        (1, 5..5, Int(5))
+    ];
+    let results: Vec<_> = tokens_in(code.lines(), &tokenizer).collect();
+    assert_eq!(results, expected_results);
+}
+
+#[test]
 fn test_multibyte_chars() {
     let line = "关于本网站的";
     // Tokenizer calls     ^    LT, and anything else an Ident.
